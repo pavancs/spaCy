@@ -20,7 +20,8 @@ mixin h(level, id)
               info: https://mathiasbynens.github.io/rel-noopener/
 
 mixin a(url, trusted)
-    a(href=url target="_blank" rel=!trusted ? "noopener nofollow" : false)&attributes(attributes)
+    - external = url.includes("http")
+    a(href=url target=external ? "_blank" : null rel=external && !trusted ? "noopener nofollow" : null)&attributes(attributes)
         block
 
 
@@ -33,7 +34,7 @@ mixin src(url)
         +a(url)
             block
 
-        |   #[+icon("code", 16).u-color-subtle]
+        |   #[+icon("code", 16).o-icon--inline.u-color-subtle]
 
 
 //- API link (with added tag and automatically generated path)
@@ -43,7 +44,15 @@ mixin api(path)
     +a("/docs/api/" + path, true)(target="_self").u-no-border.u-inline-block
         block
 
-        |  #[+icon("book", 18).o-help-icon.u-color-subtle]
+        |  #[+icon("book", 18).o-icon--inline.u-color-subtle]
+
+
+//- Help icon with tooltip
+    tooltip - [string] Tooltip text
+
+mixin help(tooltip)
+    span(data-tooltip=tooltip)&attributes(attributes)
+        +icon("help", 16).i-icon--inline
 
 
 //- Aside for text
@@ -66,6 +75,17 @@ mixin aside-code(label, language)
             block
 
 
+//- Infobox
+    label - [string] infobox title (optional or false for no title)
+
+mixin infobox(label)
+    aside.o-box.o-block.u-text-small
+        if label
+            h3.u-text-label.u-color-theme=label
+
+        block
+
+
 //- Link button
     url      - [string] link href
     trusted  - [boolean] if not set / false, rel="noopener nofollow" is added
@@ -74,7 +94,8 @@ mixin aside-code(label, language)
                see assets/css/_components/_buttons.sass
 
 mixin button(url, trusted, ...style)
-    a.c-button.u-text-label(href=url class=prefixArgs(style, "c-button") role="button" target="_blank" rel=!trusted ? "noopener nofollow" : false)&attributes(attributes)
+    - external = url.includes("http")
+    a.c-button.u-text-label(href=url class=prefixArgs(style, "c-button") role="button" target=external ? "_blank" : null rel=external && !trusted ? "noopener nofollow" : null)&attributes(attributes)
         block
 
 
@@ -148,7 +169,7 @@ mixin tag()
 
 mixin list(type, start)
     if type
-        ol.c-list.o-block.u-text(class="c-list--#{type}" style=(start === 0 || start) ? "counter-reset: li #{(start - 1)}" : false)&attributes(attributes)
+        ol.c-list.o-block.u-text(class="c-list--#{type}" style=(start === 0 || start) ? "counter-reset: li #{(start - 1)}" : null)&attributes(attributes)
             block
 
     else
@@ -185,8 +206,8 @@ mixin table(head)
 
 //- Table row (only used within +table)
 
-mixin row()
-    tr.c-table__row&attributes(attributes)
+mixin row(...style)
+    tr.c-table__row(class=prefixArgs(style, "c-table__row"))&attributes(attributes)
         block
 
 
@@ -270,3 +291,39 @@ mixin card-item(title, details)
         if details.author
             br
             span.u-text-small.u-color-subtle by #{details.author}
+
+
+//- Table row for models table
+
+mixin model-row(name, lang, procon, size, license, default_model, divider)
+    - var licenses = { "CC BY-SA": "https://creativecommons.org/licenses/by-sa/3.0/", "CC BY-NC": "https://creativecommons.org/licenses/by-nc/3.0/" }
+
+    +row(divider ? "divider": null)
+        +cell #[code=name]
+            if default_model
+                |  #[span.u-color-theme(title="default model") #[+icon("star", 16)]]
+        +cell=lang
+        each icon in procon
+            +cell.u-text-center #[+procon(icon ? "pro" : "con")]
+        +cell.u-text-right=size
+        +cell
+            if license in licenses
+                +a(licenses[license])=license
+
+
+//- Table rows for annotation specs
+
+mixin pos-row(tag, pos, morph, desc)
+    +row
+        +cell #[code=tag]
+        +cell #[code=pos]
+        +cell
+            each m in morph.split(" ")
+                if m
+                    |  #[code=m]
+        +cell.u-text-small=desc
+
+mixin dep-row(label, desc)
+    +row
+        +cell #[code=label]
+        +cell=desc

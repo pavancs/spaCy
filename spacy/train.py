@@ -1,22 +1,25 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
+# coding: utf8
+from __future__ import absolute_import, unicode_literals
 
 import random
-from .gold import GoldParse
+import tqdm
+from .gold import GoldParse, merge_sents
 from .scorer import Scorer
-from .gold import merge_sents
 
 
 class Trainer(object):
-    '''Manage training of an NLP pipeline.'''
+    """
+    Manage training of an NLP pipeline.
+    """
     def __init__(self, nlp, gold_tuples):
         self.nlp = nlp
         self.gold_tuples = gold_tuples
+        self.nr_epoch = 0
 
     def epochs(self, nr_epoch, augment_data=None, gold_preproc=False):
         cached_golds = {}
         def _epoch(indices):
-            for i in indices:
+            for i in tqdm.tqdm(indices):
                 raw_text, paragraph_tuples = self.gold_tuples[i]
                 if gold_preproc:
                     raw_text = None
@@ -39,12 +42,14 @@ class Trainer(object):
         for itn in range(nr_epoch):
             random.shuffle(indices)
             yield _epoch(indices)
- 
+            self.nr_epoch += 1
+
     def update(self, doc, gold):
         for process in self.nlp.pipeline:
             if hasattr(process, 'update'):
-                process.update(doc, gold)
-            process(doc)
+                loss = process.update(doc, gold, itn=self.nr_epoch)
+            else:
+                process(doc)
         return doc
 
     def evaluate(self, dev_sents, gold_preproc=False):

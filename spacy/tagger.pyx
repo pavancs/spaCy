@@ -1,25 +1,23 @@
-import json
-import pathlib
+# coding: utf8
+from __future__ import unicode_literals
+
+import ujson
 from collections import defaultdict
-from libc.string cimport memset
 
 from cymem.cymem cimport Pool
-from thinc.typedefs cimport atom_t, weight_t
+from thinc.typedefs cimport atom_t
 from thinc.extra.eg cimport Example
 from thinc.structs cimport ExampleC
 from thinc.linear.avgtron cimport AveragedPerceptron
 from thinc.linalg cimport VecVec
 
-from .typedefs cimport attr_t
 from .tokens.doc cimport Doc
 from .attrs cimport TAG
-from .parts_of_speech cimport NO_TAG, ADJ, ADV, ADP, CONJ, DET, NOUN, NUM, PRON
-from .parts_of_speech cimport VERB, X, PUNCT, EOL, SPACE
 from .gold cimport GoldParse
-
 from .attrs cimport *
+from . import util
 
- 
+
 cpdef enum:
     P2_orth
     P2_cluster
@@ -70,8 +68,16 @@ cpdef enum:
 
 
 cdef class TaggerModel(AveragedPerceptron):
+    def update(self, Example eg):
+        self.time += 1
+        guess = eg.guess
+        best = VecVec.arg_max_if_zero(eg.c.scores, eg.c.costs, eg.c.nr_class)
+        if guess != best:
+            for feat in eg.c.features[:eg.c.nr_feat]:
+                self.update_weight(feat.key, best, -feat.value)
+                self.update_weight(feat.key, guess, feat.value)
+
     cdef void set_featuresC(self, ExampleC* eg, const TokenC* tokens, int i) except *:
-        
         _fill_from_token(&eg.atoms[P2_orth], &tokens[i-2])
         _fill_from_token(&eg.atoms[P1_orth], &tokens[i-1])
         _fill_from_token(&eg.atoms[W_orth], &tokens[i])
@@ -102,10 +108,13 @@ cdef inline void _fill_from_token(atom_t* context, const TokenC* t) nogil:
 
 
 cdef class Tagger:
-    """Annotate part-of-speech tags on Doc objects."""
+    """
+    Annotate part-of-speech tags on Doc objects.
+    """
     @classmethod
     def load(cls, path, vocab, require=False):
-        """Load the statistical model from the supplied path.
+        """
+        Load the statistical model from the supplied path.
 
         Arguments:
             path (Path):
@@ -119,10 +128,10 @@ cdef class Tagger:
         """
         # TODO: Change this to expect config.json when we don't have to
         # support old data.
-        path = path if not isinstance(path, basestring) else pathlib.Path(path)
+        path = util.ensure_path(path)
         if (path / 'templates.json').exists():
             with (path / 'templates.json').open('r', encoding='utf8') as file_:
-                templates = json.load(file_)
+                templates = ujson.load(file_)
         elif require:
             raise IOError(
                 "Required file %s/templates.json not found when loading Tagger" % str(path))
@@ -138,7 +147,8 @@ cdef class Tagger:
         return self
 
     def __init__(self, Vocab vocab, TaggerModel model=None, **cfg):
-        """Create a Tagger.
+        """
+        Create a Tagger.
 
         Arguments:
             vocab (Vocab):
@@ -149,9 +159,11 @@ cdef class Tagger:
             The newly constructed object.
         """
         if model is None:
-            model = TaggerModel(cfg.get('features', self.feature_templates))
+            model = TaggerModel(cfg.get('features', self.feature_templates),
+                                L1=0.0)
         self.vocab = vocab
         self.model = model
+        self.model.l1_penalty = 0.0
         # TODO: Move this to tag map
         self.freqs = {TAG: defaultdict(int)}
         for tag in self.tag_names:
@@ -174,7 +186,8 @@ cdef class Tagger:
         tokens._py_tokens = [None] * tokens.length
 
     def __call__(self, Doc tokens):
-        """Apply the tagger, setting the POS tags onto the Doc object.
+        """
+        Apply the tagger, setting the POS tags onto the Doc object.
 
         Arguments:
             doc (Doc): The tokens to be tagged.
@@ -191,7 +204,7 @@ cdef class Tagger:
                                   nr_class=self.vocab.morphology.n_tags,
                                   nr_feat=self.model.nr_feat)
         for i in range(tokens.length):
-            if tokens.c[i].pos == 0:                
+            if tokens.c[i].pos == 0:
                 self.model.set_featuresC(&eg.c, tokens.c, i)
                 self.model.set_scoresC(eg.c.scores,
                     eg.c.features, eg.c.nr_feat)
@@ -202,7 +215,8 @@ cdef class Tagger:
         tokens._py_tokens = [None] * tokens.length
 
     def pipe(self, stream, batch_size=1000, n_threads=2):
-        """Tag a stream of documents.
+        """
+        Tag a stream of documents.
 
         Arguments:
             stream: The sequence of documents to tag.
@@ -217,9 +231,10 @@ cdef class Tagger:
         for doc in stream:
             self(doc)
             yield doc
-    
-    def update(self, Doc tokens, GoldParse gold):
-        """Update the statistical model, with tags supplied for the given document.
+
+    def update(self, Doc tokens, GoldParse gold, itn=0):
+        """
+        Update the statistical model, with tags supplied for the given document.
 
         Arguments:
             doc (Doc):
@@ -248,10 +263,10 @@ cdef class Tagger:
             eg.costs = [ 1 if golds[i] not in (c, -1) else 0 for c in xrange(eg.nr_class) ]
             self.model.set_scoresC(eg.c.scores,
                 eg.c.features, eg.c.nr_feat)
-            self.model.updateC(&eg.c)
+            self.model.update(eg)
 
             self.vocab.morphology.assign_tag_id(&tokens.c[i], eg.guess)
-            
+
             correct += eg.cost == 0
             self.freqs[TAG][tokens.c[i].tag] += 1
             eg.fill_scores(0, eg.c.nr_class)

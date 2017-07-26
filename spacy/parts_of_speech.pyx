@@ -1,3 +1,4 @@
+# coding: utf8
 from __future__ import unicode_literals
 
 
@@ -7,7 +8,8 @@ IDS = {
     "ADP": ADP,
     "ADV": ADV,
     "AUX": AUX,
-    "CONJ": CONJ,
+    "CONJ": CONJ, # U20
+    "CCONJ": CCONJ,
     "DET": DET,
     "INTJ": INTJ,
     "NOUN": NOUN,

@@ -8,44 +8,13 @@ import contextlib
 from distutils.command.build_ext import build_ext
 from distutils.sysconfig import get_python_inc
 from distutils import ccompiler, msvccompiler
-
-try:
-    from setuptools import Extension, setup
-except ImportError:
-    from distutils.core import Extension, setup
+from setuptools import Extension, setup, find_packages
 
 
 PACKAGE_DATA = {'': ['*.pyx', '*.pxd', '*.txt', '*.tokens']}
 
 
-PACKAGES = [
-    'spacy',
-    'spacy.tokens',
-    'spacy.en',
-    'spacy.de',
-    'spacy.zh',
-    'spacy.es',
-    'spacy.fr',
-    'spacy.it',
-    'spacy.pt',
-    'spacy.nl',
-    'spacy.serialize',
-    'spacy.syntax',
-    'spacy.munge',
-    'spacy.tests',
-    'spacy.tests.matcher',
-    'spacy.tests.morphology',
-    'spacy.tests.munge',
-    'spacy.tests.parser',
-    'spacy.tests.print',
-    'spacy.tests.serialize',
-    'spacy.tests.spans',
-    'spacy.tests.tagger',
-    'spacy.tests.tokenizer',
-    'spacy.tests.tokens',
-    'spacy.tests.vectors',
-    'spacy.tests.vocab',
-    'spacy.tests.website']
+PACKAGES = find_packages()
 
 
 MOD_NAMES = [
@@ -61,6 +30,7 @@ MOD_NAMES = [
     'spacy.syntax._state',
     'spacy.tokenizer',
     'spacy.syntax.parser',
+    'spacy.syntax.beam_parser',
     'spacy.syntax.nonproj',
     'spacy.syntax.transition_system',
     'spacy.syntax.arc_eager',
@@ -78,6 +48,7 @@ MOD_NAMES = [
     'spacy.syntax.ner',
     'spacy.symbols',
     'spacy.syntax.iterators']
+    # TODO: This is missing a lot of modules. Does it matter?
 
 
 COMPILE_OPTIONS =  {
@@ -93,18 +64,9 @@ LINK_OPTIONS = {
     'other' : []
 }
 
- 
+
 # I don't understand this very well yet. See Issue #267
 # Fingers crossed!
-#if os.environ.get('USE_OPENMP') == '1':
-#    compile_options['msvc'].append('/openmp')
-#
-#
-#if not sys.platform.startswith('darwin'):
-#    compile_options['other'].append('-fopenmp')
-#    link_options['other'].append('-fopenmp')
-#
-
 USE_OPENMP_DEFAULT = '1' if sys.platform != 'darwin' else None
 if os.environ.get('USE_OPENMP', USE_OPENMP_DEFAULT) == '1':
     if sys.platform == 'darwin':
@@ -119,6 +81,7 @@ if os.environ.get('USE_OPENMP', USE_OPENMP_DEFAULT) == '1':
     else:
         COMPILE_OPTIONS['other'].append('-fopenmp')
         LINK_OPTIONS['other'].append('-fopenmp')
+
 
 # By subclassing build_extensions we have the actual compiler that will be used which is really known only after finalize_options
 # http://stackoverflow.com/questions/724664/python-distutils-how-to-get-a-compiler-that-is-going-to-be-used
@@ -142,7 +105,7 @@ def generate_cython(root, source):
     print('Cythonizing sources')
     p = subprocess.call([sys.executable,
                          os.path.join(root, 'bin', 'cythonize.py'),
-                         source])
+                         source], env=os.environ)
     if p != 0:
         raise RuntimeError('Running cythonize failed')
 
@@ -231,14 +194,17 @@ def setup_package():
                 'numpy>=1.7',
                 'murmurhash>=0.26,<0.27',
                 'cymem>=1.30,<1.32',
-                'preshed>=0.46.0,<0.47.0',
-                'thinc>=5.0.0,<5.1.0',
-                'plac',
+                'preshed>=1.0.0,<2.0.0',
+                'thinc>=6.5.0,<6.6.0',
+                'plac<1.0.0,>=0.9.6',
+                'pip>=9.0.0,<10.0.0',
                 'six',
-                'cloudpickle',
                 'pathlib',
-                'sputnik>=0.9.2,<0.10.0',
-                'ujson>=1.35'],
+                'ujson>=1.35',
+                'dill>=0.2,<0.3',
+                'requests>=2.13.0,<3.0.0',
+                'regex>=2017.4.1,<2017.12.1',
+                'ftfy>=4.4.2,<5.0.0'],
             classifiers=[
                 'Development Status :: 5 - Production/Stable',
                 'Environment :: Console',
@@ -254,6 +220,7 @@ def setup_package():
                 'Programming Language :: Python :: 3.3',
                 'Programming Language :: Python :: 3.4',
                 'Programming Language :: Python :: 3.5',
+                'Programming Language :: Python :: 3.6',
                 'Topic :: Scientific/Engineering'],
             cmdclass = {
                 'build_ext': build_ext_subclass},

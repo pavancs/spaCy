@@ -1,20 +1,11 @@
 # cython: embedsignature=True
+# coding: utf8
 from __future__ import unicode_literals
 
-import re
-import pathlib
+import ujson
 
 from cython.operator cimport dereference as deref
 from cython.operator cimport preincrement as preinc
-from cpython cimport Py_UNICODE_ISSPACE
-
-
-try:
-    import ujson as json
-except ImportError:
-    import json
-
-
 from cymem.cymem cimport Pool
 from preshed.maps cimport PreshMap
 
@@ -26,12 +17,15 @@ from .tokens.doc cimport Doc
 
 
 cdef class Tokenizer:
-    """Segment text, and create Doc objects with the discovered segment boundaries."""
+    """
+    Segment text, and create Doc objects with the discovered segment boundaries.
+    """
     @classmethod
     def load(cls, path, Vocab vocab, rules=None, prefix_search=None, suffix_search=None,
-             infix_finditer=None):
-        '''Load a Tokenizer, reading unsupplied components from the path.
-        
+             infix_finditer=None, token_match=None):
+        """
+        Load a Tokenizer, reading unsupplied components from the path.
+
         Arguments:
             path (Path):
                 The path to load from.
@@ -39,6 +33,8 @@ cdef class Tokenizer:
                 A storage container for lexical types.
             rules (dict):
                 Exceptions and special-cases for the tokenizer.
+            token_match:
+                A boolean function matching strings that becomes tokens.
             prefix_search:
                 Signature of re.compile(string).search
             suffix_search:
@@ -46,13 +42,11 @@ cdef class Tokenizer:
             infix_finditer:
                 Signature of re.compile(string).finditer
         Returns Tokenizer
-        '''
-        if isinstance(path, basestring):
-            path = pathlib.Path(path)
-
+        """
+        path = util.ensure_path(path)
         if rules is None:
             with (path / 'tokenizer' / 'specials.json').open('r', encoding='utf8') as file_:
-                rules = json.load(file_)
+                rules = ujson.load(file_)
         if prefix_search in (None, True):
             with (path / 'tokenizer' / 'prefix.txt').open() as file_:
                 entries = file_.read().split('\n')
@@ -65,12 +59,12 @@ cdef class Tokenizer:
             with (path / 'tokenizer' / 'infix.txt').open() as file_:
                 entries = file_.read().split('\n')
             infix_finditer = util.compile_infix_regex(entries).finditer
-        return cls(vocab, rules, prefix_search, suffix_search, infix_finditer)
+        return cls(vocab, rules, prefix_search, suffix_search, infix_finditer, token_match)
 
+    def __init__(self, Vocab vocab, rules, prefix_search, suffix_search, infix_finditer, token_match=None):
+        """
+        Create a Tokenizer, to create Doc objects given unicode text.
 
-    def __init__(self, Vocab vocab, rules, prefix_search, suffix_search, infix_finditer):
-        '''Create a Tokenizer, to create Doc objects given unicode text.
-        
         Arguments:
             vocab (Vocab):
                 A storage container for lexical types.
@@ -85,10 +79,13 @@ cdef class Tokenizer:
             infix_finditer:
                 A function matching the signature of re.compile(string).finditer
                 to find infixes.
-        '''
+            token_match:
+                A boolean function matching strings that becomes tokens.
+        """
         self.mem = Pool()
         self._cache = PreshMap()
         self._specials = PreshMap()
+        self.token_match = token_match
         self.prefix_search = prefix_search
         self.suffix_search = suffix_search
         self.infix_finditer = infix_finditer
@@ -100,12 +97,13 @@ cdef class Tokenizer:
     def __reduce__(self):
         args = (self.vocab,
                 self._rules,
-                self._prefix_re, 
-                self._suffix_re, 
-                self._infix_re)
+                self._prefix_re,
+                self._suffix_re,
+                self._infix_re,
+                self.token_match)
 
         return (self.__class__, args, None, None)
-    
+
     cpdef Doc tokens_from_list(self, list strings):
         return Doc(self.vocab, words=strings)
         #raise NotImplementedError(
@@ -115,7 +113,8 @@ cdef class Tokenizer:
 
     @cython.boundscheck(False)
     def __call__(self, unicode string):
-        """Tokenize a string.
+        """
+        Tokenize a string.
 
         Arguments:
             string (unicode): The string to tokenize.
@@ -158,7 +157,6 @@ cdef class Tokenizer:
                     start = i
                 in_ws = not in_ws
             i += 1
-        i += 1
         if start < i:
             span = string[start:]
             key = hash_string(span)
@@ -169,7 +167,8 @@ cdef class Tokenizer:
         return tokens
 
     def pipe(self, texts, batch_size=1000, n_threads=2):
-        """Tokenize a stream of texts.
+        """
+        Tokenize a stream of texts.
 
         Arguments:
             texts: A sequence of unicode texts.
@@ -187,7 +186,13 @@ cdef class Tokenizer:
     cdef int _try_cache(self, hash_t key, Doc tokens) except -1:
         cached = <_Cached*>self._cache.get(key)
         if cached == NULL:
-            return False
+            # See 'flush_cache' below for hand-wringing about
+            # how to handle this.
+            cached = <_Cached*>self._specials.get(key)
+            if cached == NULL:
+                return False
+            else:
+                self._cache.set(key, cached)
         cdef int i
         if cached.is_lex:
             for i in range(cached.length):
@@ -202,9 +207,15 @@ cdef class Tokenizer:
         cdef vector[LexemeC*] suffixes
         cdef int orig_size
         orig_size = tokens.length
-        span = self._split_affixes(tokens.mem, span, &prefixes, &suffixes)
-        self._attach_tokens(tokens, span, &prefixes, &suffixes)
-        self._save_cached(&tokens.c[orig_size], orig_key, tokens.length - orig_size)
+        special_case = <const _Cached*>self._specials.get(orig_key)
+        if special_case is not NULL:
+            for i in range(special_case.length):
+                tokens.push_back(&special_case.data.tokens[i], False)
+            self._cache.set(orig_key, <void*>special_case)
+        else: 
+            span = self._split_affixes(tokens.mem, span, &prefixes, &suffixes)
+            self._attach_tokens(tokens, span, &prefixes, &suffixes)
+            self._save_cached(&tokens.c[orig_size], orig_key, tokens.length - orig_size)
 
     cdef unicode _split_affixes(self, Pool mem, unicode string,
                                 vector[const LexemeC*] *prefixes,
@@ -216,6 +227,8 @@ cdef class Tokenizer:
         cdef unicode minus_suf
         cdef size_t last_size = 0
         while string and len(string) != last_size:
+            if self.token_match and self.token_match(string):
+                break
             last_size = len(string)
             pre_len = self.find_prefix(string)
             if pre_len != 0:
@@ -225,6 +238,8 @@ cdef class Tokenizer:
                 if minus_pre and self._specials.get(hash_string(minus_pre)) != NULL:
                     string = minus_pre
                     prefixes.push_back(self.vocab.get(mem, prefix))
+                    break
+                if self.token_match and self.token_match(string):
                     break
             suf_len = self.find_suffix(string)
             if suf_len != 0:
@@ -263,7 +278,14 @@ cdef class Tokenizer:
                 tokens.push_back(prefixes[0][i], False)
         if string:
             cache_hit = self._try_cache(hash_string(string), tokens)
-            if not cache_hit:
+            if cache_hit:
+                pass
+            elif self.token_match and self.token_match(string):
+                # We're always saying 'no' to spaces here -- the caller will
+                # fix up the outermost one, with reference to the original.
+                # See Issue #859
+                tokens.push_back(self.vocab.get(tokens.mem, string), False)
+            else:
                 matches = self.find_infix(string)
                 if not matches:
                     tokens.push_back(self.vocab.get(tokens.mem, string), False)
@@ -276,21 +298,18 @@ cdef class Tokenizer:
                         infix_end = match.end()
                         if infix_start == start:
                             continue
-                        if infix_start == infix_end:
-                            msg = ("Tokenizer found a zero-width 'infix' token.\n"
-                                   "If you're using a built-in tokenizer, please\n"
-                                   "report this bug. If you're using a tokenizer\n"
-                                   "you developed, check your TOKENIZER_INFIXES\n"
-                                   "tuple.\n"
-                                   "String being matched: {string}\n"
-                                   "Language: {lang}")
-                            raise ValueError(msg.format(string=string, lang=self.vocab.lang))
 
                         span = string[start:infix_start]
                         tokens.push_back(self.vocab.get(tokens.mem, span), False)
-                    
-                        infix_span = string[infix_start:infix_end]
-                        tokens.push_back(self.vocab.get(tokens.mem, infix_span), False)
+
+                        if infix_start != infix_end:
+                            # If infix_start != infix_end, it means the infix
+                            # token is non-empty. Empty infix tokens are useful
+                            # for tokenization in some languages (see
+                            # https://github.com/explosion/spaCy/issues/768)
+                            infix_span = string[infix_start:infix_end]
+                            tokens.push_back(self.vocab.get(tokens.mem, infix_span), False)
+
                         start = infix_end
                     span = string[start:]
                     tokens.push_back(self.vocab.get(tokens.mem, span), False)
@@ -315,7 +334,8 @@ cdef class Tokenizer:
         self._cache.set(key, cached)
 
     def find_infix(self, unicode string):
-        """Find internal split points of the string, such as hyphens.
+        """
+        Find internal split points of the string, such as hyphens.
 
         string (unicode): The string to segment.
 
@@ -328,7 +348,8 @@ cdef class Tokenizer:
         return list(self.infix_finditer(string))
 
     def find_prefix(self, unicode string):
-        """Find the length of a prefix that should be segmented from the string,
+        """
+        Find the length of a prefix that should be segmented from the string,
         or None if no prefix rules match.
 
         Arguments:
@@ -341,7 +362,8 @@ cdef class Tokenizer:
         return (match.end() - match.start()) if match is not None else 0
 
     def find_suffix(self, unicode string):
-        """Find the length of a suffix that should be segmented from the string,
+        """
+        Find the length of a suffix that should be segmented from the string,
         or None if no suffix rules match.
 
         Arguments:
@@ -354,13 +376,15 @@ cdef class Tokenizer:
         return (match.end() - match.start()) if match is not None else 0
 
     def _load_special_tokenization(self, special_cases):
-        '''Add special-case tokenization rules.
-        '''
+        """
+        Add special-case tokenization rules.
+        """
         for chunk, substrings in sorted(special_cases.items()):
             self.add_special_case(chunk, substrings)
-    
+
     def add_special_case(self, unicode string, substrings):
-        '''Add a special-case tokenization rule.
+        """
+        Add a special-case tokenization rule.
 
         Arguments:
             string (unicode): The string to specially tokenize.
@@ -369,7 +393,7 @@ cdef class Tokenizer:
                 attributes. The ORTH fields of the attributes must exactly match
                 the string when they are concatenated.
         Returns None
-        '''
+        """
         substrings = list(substrings)
         cached = <_Cached*>self.mem.alloc(1, sizeof(_Cached))
         cached.length = len(substrings)
@@ -377,5 +401,29 @@ cdef class Tokenizer:
         cached.data.tokens = self.vocab.make_fused_token(substrings)
         key = hash_string(string)
         self._specials.set(key, cached)
-        self._cache.set(key, cached)
         self._rules[string] = substrings
+        # After changing the tokenization rules, the previous tokenization
+        # may be stale.
+        self.flush_cache()
+
+    def flush_cache(self):
+        '''Flush the tokenizer's cache. May not free memory immediately.
+        
+        This is called automatically after `add_special_case`, but if you
+        write to the prefix or suffix functions, you'll have to call this
+        yourself. You may also need to flush the tokenizer cache after
+        changing the lex_attr_getter functions.
+        '''
+        cdef hash_t key
+        for key in self._cache.keys():
+            special_case = self._specials.get(key)
+            # Don't free data shared with special-case rules
+            if special_case is not NULL:
+                continue
+            cached = <_Cached*>self._cache.get(key)
+            if cached is not NULL:
+                self.mem.free(cached)
+        self._cache = PreshMap(1000)
+        # We could here readd the data from specials --- but if we loop over
+        # a bunch of special-cases, we'll get a quadratic behaviour. The extra
+        # lookup isn't so bad? Tough to tell.

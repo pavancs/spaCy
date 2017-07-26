@@ -1,16 +1,8 @@
 # cython: infer_types
+# coding: utf8
 from __future__ import unicode_literals
 
-from os import path
-
 from libc.string cimport memset
-
-from .lemmatizer import Lemmatizer
-
-try:
-    import ujson as json
-except ImportError:
-    import json
 
 from .parts_of_speech cimport ADJ, VERB, NOUN, PUNCT
 from .attrs cimport POS, IS_SPACE
@@ -20,7 +12,9 @@ from .attrs import LEMMA, intify_attrs
 
 
 def _normalize_props(props):
-    '''Transform deprecated string keys to correct names.'''
+    """
+    Transform deprecated string keys to correct names.
+    """
     out = {}
     for key, value in props.items():
         if key == POS:
@@ -29,6 +23,8 @@ def _normalize_props(props):
             if value in POS_IDS:
                 value = POS_IDS[value]
             out[key] = value
+        elif isinstance(key, int):
+            out[key] = value
         elif key.lower() == 'pos':
             out[POS] = POS_IDS[value.upper()]
         else:
@@ -36,12 +32,11 @@ def _normalize_props(props):
     return out
 
 
-
 cdef class Morphology:
     def __init__(self, StringStore string_store, tag_map, lemmatizer):
         self.mem = Pool()
         self.strings = string_store
-        self.tag_map = tag_map
+        self.tag_map = {}
         self.lemmatizer = lemmatizer
         self.n_tags = len(tag_map) + 1
         self.tag_names = tuple(sorted(tag_map.keys()))
@@ -50,6 +45,7 @@ cdef class Morphology:
         self.rich_tags = <RichTagC*>self.mem.alloc(self.n_tags, sizeof(RichTagC))
         for i, (tag_str, attrs) in enumerate(sorted(tag_map.items())):
             attrs = _normalize_props(attrs)
+            self.tag_map[tag_str] = dict(attrs)
             attrs = intify_attrs(attrs, self.strings, _do_deprecated=True)
             self.rich_tags[i].id = i
             self.rich_tags[i].name = self.strings[tag_str]
@@ -78,11 +74,12 @@ cdef class Morphology:
         # Related to Issue #220
         if Lexeme.c_check_flag(token.lex, IS_SPACE):
             tag_id = self.reverse_index[self.strings['SP']]
+        rich_tag = self.rich_tags[tag_id]
         analysis = <MorphAnalysisC*>self._cache.get(tag_id, token.lex.orth)
         if analysis is NULL:
             analysis = <MorphAnalysisC*>self.mem.alloc(1, sizeof(MorphAnalysisC))
-            analysis.tag = self.rich_tags[tag_id]
             tag_str = self.strings[self.rich_tags[tag_id].name]
+            analysis.tag = rich_tag
             analysis.lemma = self.lemmatize(analysis.tag.pos, token.lex.orth,
                                             self.tag_map.get(tag_str, {}))
             self._cache.set(tag_id, token.lex.orth, analysis)
@@ -99,13 +96,14 @@ cdef class Morphology:
             flags[0] &= ~(one << flag_id)
 
     def add_special_case(self, unicode tag_str, unicode orth_str, attrs, force=False):
-        '''Add a special-case rule to the morphological analyser. Tokens whose
+        """
+        Add a special-case rule to the morphological analyser. Tokens whose
         tag and orth match the rule will receive the specified properties.
 
         Arguments:
             tag (unicode): The part-of-speech tag to key the exception.
             orth (unicode): The word-form to key the exception.
-        '''
+        """
         tag = self.strings[tag_str]
         tag_id = self.reverse_index[tag]
         orth = self.strings[orth_str]
@@ -130,8 +128,7 @@ cdef class Morphology:
             else:
                 self.assign_feature(&cached.tag.morph, name_id, value_id)
         if cached.lemma == 0:
-            cached.lemma = self.lemmatize(rich_tag.pos, orth,
-                                          self.tag_map.get(tag_str, {}))
+            cached.lemma = self.lemmatize(rich_tag.pos, orth, attrs)
         self._cache.set(tag_id, orth, <void*>cached)
 
     def load_morph_exceptions(self, dict exc):
@@ -192,6 +189,7 @@ IDS = {
     "Definite_two": Definite_two,
     "Definite_def": Definite_def,
     "Definite_red": Definite_red,
+    "Definite_cons": Definite_cons, # U20
     "Definite_ind": Definite_ind,
     "Degree_cmp": Degree_cmp,
     "Degree_comp": Degree_comp,
@@ -215,6 +213,8 @@ IDS = {
     "Negative_neg": Negative_neg,
     "Negative_pos": Negative_pos,
     "Negative_yes": Negative_yes,
+    "Polarity_neg": Polarity_neg, # U20
+    "Polarity_pos": Polarity_pos, # U20
     "Number_com": Number_com,
     "Number_dual": Number_dual,
     "Number_none": Number_none,
@@ -263,6 +263,7 @@ IDS = {
     "VerbForm_partPres": VerbForm_partPres,
     "VerbForm_sup": VerbForm_sup,
     "VerbForm_trans": VerbForm_trans,
+    "VerbForm_conv": VerbForm_conv, # U20
     "VerbForm_gdv ": VerbForm_gdv, # la,
     "Voice_act": Voice_act,
     "Voice_cau": Voice_cau,

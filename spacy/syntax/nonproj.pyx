@@ -1,14 +1,15 @@
+# coding: utf-8
 from __future__ import unicode_literals
 from copy import copy
 
 from ..tokens.doc cimport Doc
-from spacy.attrs import DEP, HEAD
+from ..attrs import DEP, HEAD
 
 
 def ancestors(tokenid, heads):
     # returns all words going from the word up the path to the root
     # the path to root cannot be longer than the number of words in the sentence
-    # this function ends after at most len(heads) steps 
+    # this function ends after at most len(heads) steps
     # because it would otherwise loop indefinitely on cycles
     head = tokenid
     cnt = 0
@@ -180,7 +181,7 @@ class PseudoProjectivity:
             next_queue = []
             for qtoken in queue:
                 for child in qtoken.children:
-                    if child.is_space: continue                        
+                    if child.is_space: continue
                     if child == token: continue
                     if child.dep_ == headlabel:
                         return child
@@ -201,5 +202,3 @@ class PseudoProjectivity:
                 filtered_sents.append(((ids,words,tags,heads,filtered_labels,iob), ctnts))
             filtered.append((raw_text, filtered_sents))
         return filtered
-
-

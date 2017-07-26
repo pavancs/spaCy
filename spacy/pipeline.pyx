@@ -1,7 +1,10 @@
+# coding: utf8
+from __future__ import unicode_literals
+
 from .syntax.parser cimport Parser
+from .syntax.beam_parser cimport BeamParser
 from .syntax.ner cimport BiluoPushDown
 from .syntax.arc_eager cimport ArcEager
-from .vocab cimport Vocab
 from .tagger import Tagger
 
 # TODO: The disorganization here is pretty embarrassing. At least it's only
@@ -11,20 +14,40 @@ from .attrs import DEP, ENT_TYPE
 
 
 cdef class EntityRecognizer(Parser):
-    """Annotate named entities on Doc objects."""
+    """
+    Annotate named entities on Doc objects.
+    """
     TransitionSystem = BiluoPushDown
-    
+
     feature_templates = get_feature_templates('ner')
 
     def add_label(self, label):
-        for action in self.moves.action_types:
-            self.moves.add_action(action, label)
+        Parser.add_label(self, label)
         if isinstance(label, basestring):
             label = self.vocab.strings[label]
+        # Set label into serializer. Super hacky :(
         for attr, freqs in self.vocab.serializer_freqs:
             if attr == ENT_TYPE and label not in freqs:
                 freqs.append([label, 1])
-        # Super hacky :(
+        self.vocab._serializer = None
+
+
+cdef class BeamEntityRecognizer(BeamParser):
+    """
+    Annotate named entities on Doc objects.
+    """
+    TransitionSystem = BiluoPushDown
+
+    feature_templates = get_feature_templates('ner')
+
+    def add_label(self, label):
+        Parser.add_label(self, label)
+        if isinstance(label, basestring):
+            label = self.vocab.strings[label]
+        # Set label into serializer. Super hacky :(
+        for attr, freqs in self.vocab.serializer_freqs:
+            if attr == ENT_TYPE and label not in freqs:
+                freqs.append([label, 1])
         self.vocab._serializer = None
 
 
@@ -34,8 +57,7 @@ cdef class DependencyParser(Parser):
     feature_templates = get_feature_templates('basic')
 
     def add_label(self, label):
-        for action in self.moves.action_types:
-            self.moves.add_action(action, label)
+        Parser.add_label(self, label)
         if isinstance(label, basestring):
             label = self.vocab.strings[label]
         for attr, freqs in self.vocab.serializer_freqs:
@@ -45,4 +67,20 @@ cdef class DependencyParser(Parser):
         self.vocab._serializer = None
 
 
-__all__ = [Tagger, DependencyParser, EntityRecognizer]
+cdef class BeamDependencyParser(BeamParser):
+    TransitionSystem = ArcEager
+
+    feature_templates = get_feature_templates('basic')
+
+    def add_label(self, label):
+        Parser.add_label(self, label)
+        if isinstance(label, basestring):
+            label = self.vocab.strings[label]
+        for attr, freqs in self.vocab.serializer_freqs:
+            if attr == DEP and label not in freqs:
+                freqs.append([label, 1])
+        # Super hacky :(
+        self.vocab._serializer = None
+
+
+__all__ = [Tagger, DependencyParser, EntityRecognizer, BeamDependencyParser, BeamEntityRecognizer]

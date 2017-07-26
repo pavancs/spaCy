@@ -1,3 +1,7 @@
+# coding: utf8
+from __future__ import unicode_literals
+
+
 IDS = {
     "": NULL_ATTR,
     "IS_ALPHA": IS_ALPHA,
@@ -92,8 +96,9 @@ NAMES = [key for key, value in sorted(IDS.items(), key=lambda item: item[1])]
 
 
 def intify_attrs(stringy_attrs, strings_map=None, _do_deprecated=False):
-    '''Normalize a dictionary of attributes, converting them to ints.
-    
+    """
+    Normalize a dictionary of attributes, converting them to ints.
+
     Arguments:
         stringy_attrs (dict):
             Dictionary keyed by attribute string names. Values can be ints or strings.
@@ -105,7 +110,7 @@ def intify_attrs(stringy_attrs, strings_map=None, _do_deprecated=False):
         inty_attrs (dict):
             Attributes dictionary with keys and optionally values converted to
             ints.
-    '''
+    """
     inty_attrs = {}
     if _do_deprecated:
         if 'F' in stringy_attrs:
@@ -124,8 +129,13 @@ def intify_attrs(stringy_attrs, strings_map=None, _do_deprecated=False):
             'PunctType', 'PunctSide', 'Other', 'Degree', 'AdvType', 'Number',
             'VerbForm', 'PronType', 'Aspect', 'Tense', 'PartType', 'Poss',
             'Hyph', 'ConjType', 'NumType', 'Foreign', 'VerbType', 'NounType',
-            'Number', 'PronType', 'AdjType', 'Person', 'Variant', 'AdpType',
-            'Reflex', 'Negative', 'Mood', 'Aspect', 'Case']
+            'Gender', 'Mood', 'Negative', 'Tense', 'Voice', 'Abbr',
+            'Derivation', 'Echo', 'Foreign', 'NameType', 'NounType', 'NumForm',
+            'NumValue', 'PartType', 'Polite', 'StyleVariant',
+            'PronType', 'AdjType', 'Person', 'Variant', 'AdpType',
+            'Reflex', 'Negative', 'Mood', 'Aspect', 'Case',
+            'Polarity', # U20
+        ]
         for key in morph_keys:
             if key in stringy_attrs:
                 stringy_attrs.pop(key)

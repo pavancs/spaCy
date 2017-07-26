@@ -1,36 +1,14 @@
-from __future__ import unicode_literals, print_function
-import codecs
-import pathlib
-
-import ujson as json
+# coding: utf8
+from __future__ import unicode_literals
 
 from .symbols import POS, NOUN, VERB, ADJ, PUNCT
+from .symbols import VerbForm_inf, VerbForm_none, Number_sing, Degree_pos
 
 
 class Lemmatizer(object):
     @classmethod
-    def load(cls, path, rules=None):
-        index = {}
-        exc = {}
-        for pos in ['adj', 'noun', 'verb']:
-            pos_index_path = path / 'wordnet' / 'index.{pos}'.format(pos=pos)
-            if pos_index_path.exists():
-                with pos_index_path.open() as file_:
-                    index[pos] = read_index(file_)
-            else:
-                index[pos] = set()
-            pos_exc_path = path / 'wordnet' / '{pos}.exc'.format(pos=pos)
-            if pos_exc_path.exists():
-                with pos_exc_path.open() as file_:
-                    exc[pos] = read_exc(file_)
-            else:
-                exc[pos] = {}
-        if rules is None and (path / 'vocab' / 'lemma_rules.json').exists():
-            with (path / 'vocab' / 'lemma_rules.json').open('r', encoding='utf8') as file_:
-                rules = json.load(file_)
-        elif rules is None:
-            rules = {}
-        return cls(index, exc, rules)
+    def load(cls, path, index=None, exc=None, rules=None):
+        return cls(index or {}, exc or {}, rules or {})
 
     def __init__(self, index, exceptions, rules):
         self.index = index
@@ -55,13 +33,26 @@ class Lemmatizer(object):
         return lemmas
 
     def is_base_form(self, univ_pos, morphology=None):
-        '''Check whether we're dealing with an uninflected paradigm, so we can
-        avoid lemmatization entirely.'''
+        """
+        Check whether we're dealing with an uninflected paradigm, so we can
+        avoid lemmatization entirely.
+        """
         morphology = {} if morphology is None else morphology
         others = [key for key in morphology if key not in (POS, 'number', 'pos', 'verbform')]
-        if univ_pos == 'noun' and morphology.get('number') == 'sing' and not others:
+        true_morph_key = morphology.get('morph', 0)
+        if univ_pos == 'noun' and morphology.get('Number') == 'sing':
             return True
-        elif univ_pos == 'verb' and morphology.get('verbform') == 'inf' and not others:
+        elif univ_pos == 'verb' and morphology.get('VerbForm') == 'inf':
+            return True
+        elif univ_pos == 'adj' and morphology.get('Degree') == 'pos':
+            return True
+        elif VerbForm_inf in morphology:
+            return True
+        elif VerbForm_none in morphology:
+            return True
+        elif Number_sing in morphology:
+            return True
+        elif Degree_pos in morphology:
             return True
         else:
             return False
@@ -86,33 +77,18 @@ def lemmatize(string, index, exceptions, rules):
     #if string in index:
     #    forms.append(string)
     forms.extend(exceptions.get(string, []))
+    oov_forms = []
     for old, new in rules:
         if string.endswith(old):
             form = string[:len(string) - len(old)] + new
-            if form in index or not form.isalpha():
+            if not form:
+                pass
+            elif form in index or not form.isalpha():
                 forms.append(form)
+            else:
+                oov_forms.append(form)
+    if not forms:
+        forms.extend(oov_forms)
     if not forms:
         forms.append(string)
     return set(forms)
-
-
-def read_index(fileobj):
-    index = set()
-    for line in fileobj:
-        if line.startswith(' '):
-            continue
-        pieces = line.split()
-        word = pieces[0]
-        if word.count('_') == 0:
-            index.add(word)
-    return index
-
-
-def read_exc(fileobj):
-    exceptions = {}
-    for line in fileobj:
-        if line.startswith(' '):
-            continue
-        pieces = line.split()
-        exceptions[pieces[0]] = tuple(pieces[1:])
-    return exceptions

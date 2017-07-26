@@ -1,6 +1,7 @@
 //- 💫 MIXINS > BASE
 
 //- Aside wrapper
+    label - [string] aside label
 
 mixin aside-wrapper(label)
     aside.c-aside
@@ -21,6 +22,10 @@ mixin date(input)
 
 
 //- SVG from map
+    file   - [string] SVG file name in /assets/img/
+    name   - [string] SVG symbol id
+    width  - [integer] width in px
+    height - [integer] height in px (default: same as width)
 
 mixin svg(file, name, width, height)
     svg(aria-hidden="true" viewBox="0 0 #{width} #{height || width}" width=width height=(height || width))&attributes(attributes)
@@ -28,19 +33,23 @@ mixin svg(file, name, width, height)
 
 
 //- Icon
+    name - [string] icon name, should be SVG symbol ID
+    size - [integer] icon width and height (default: 20)
 
 mixin icon(name, size)
-    +svg("icons", "icon-" + name, size || 20).o-icon&attributes(attributes)
+    +svg("icons", name, size || 20).o-icon&attributes(attributes)
 
 
 //- Pro/Con/Neutral icon
+    icon - [string] "pro", "con" or "neutral" (default: "neutral")
 
 mixin procon(icon)
-    - colors = { pro: "green", con: "red" }
+    - colors = { pro: "green", con: "red", neutral: "yellow" }
     +icon(icon)(class="u-color-#{colors[icon] || 'subtle'}" aria-label=icon)&attributes(attributes)
 
 
 //- Headlines Helper Mixin
+    level - [integer] 1, 2, 3, 4, or 5
 
 mixin headline(level)
     if level == 1
@@ -65,6 +74,7 @@ mixin headline(level)
 
 
 //- Permalink rendering
+    id - [string] permalink ID used for link anchor
 
 mixin permalink(id)
     if id
@@ -77,6 +87,7 @@ mixin permalink(id)
 
 
 //- Terminal-style code window
+    label - [string] title displayed in top bar of terminal window
 
 mixin terminal(label)
     .x-terminal
@@ -87,10 +98,74 @@ mixin terminal(label)
             block
 
 
+//- Gitter chat button and widget
+    button - [string] text shown on button
+    label  - [string] title of chat window (default: same as button)
+
+mixin gitter(button, label)
+    aside.js-gitter.c-chat.is-collapsed(data-title=(label || button))
+
+    button.js-gitter-button.c-chat__button.u-text-small
+        +icon("chat").o-icon--inline
+        !=button
+
+
+//- Badge
+    name - [string] "pipy" or "conda"
+
+mixin badge(name)
+    - site = BADGES[name]
+
+    if site
+        +a(site.link).u-padding-small
+            img(src=site.badge alt="{name} version" height="20")
+
+
+//- Quickstart widget
+    quickstart.js with manual markup, inspired by PyTorch's "Getting started"
+    groups - [object] option groups, uses global variable QUICKSTART
+    headline - [string] optional text to be rendered as widget headline
+
+mixin quickstart(groups, headline)
+    .c-quickstart.o-block-small#qs
+        .c-quickstart__content
+            if headline
+                +h(2)=headline
+            for group in groups
+                .c-quickstart__group.u-text-small(data-qs-group=group.id)
+                    .c-quickstart__legend=group.title
+                    .c-quickstart__fields
+                        for option in group.options
+                            input.c-quickstart__input(class="c-quickstart__input--" + (group.multiple ? "check" : "radio") type=group.multiple ? "checkbox" : "radio" name=group.id id="qs-#{option.id}" value=option.id checked=option.checked)
+                            label.c-quickstart__label(for="qs-#{option.id}")=option.title
+                                if option.meta
+                                    |  #[span.c-quickstart__label__meta (#{option.meta})]
+                                if option.help
+                                    |  #[+help(option.help).c-quickstart__label__meta]
+
+        pre.c-code-block
+            code.c-code-block__content.c-quickstart__code(data-qs-results="")
+                block
+
+    .c-quickstart__info.u-text-tiny.o-block.u-text-right
+        |  Like this widget? Check out #[+a("https://github.com/ines/quickstart").u-link quickstart.js]!
+
+
+//- Quickstart code item
+    data [object] - Rendering conditions (keyed by option group ID, value: option)
+
+mixin qs(data)
+    - args = {}
+    for value, setting in data
+        - args['data-qs-' + setting] = value
+    span.c-quickstart__line&attributes(args)
+        block
+
+
 //- Logo
 
 mixin logo()
-    +svg("graphics", "spacy", 500).o-logo&attributes(attributes)
+    +svg("graphics", "spacy", 675, 215).o-logo&attributes(attributes)
 
 
 //- Landing
@@ -100,3 +175,8 @@ mixin landing-header()
         .c-landing__wrapper
             .c-landing__content
                 block
+
+
+mixin landing-badge(url, graphic, alt, size)
+    +a(url)(aria-label=alt title=alt).c-landing__badge
+        +svg("graphics", graphic, size || 225)

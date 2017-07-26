@@ -1,49 +1,42 @@
-import pathlib
+# coding: utf8
+from __future__ import unicode_literals
 
-from .util import set_lang_class, get_lang_class
+from . import util
+from .deprecated import resolve_model_name
+from .cli.info import info
+from .glossary import explain
 from .about import __version__
 
-from . import en
-from . import de
-from . import zh
-from . import es
-from . import it
-from . import fr
-from . import pt
-from . import nl
+from . import en, de, zh, es, it, hu, fr, pt, nl, sv, fi, bn, he, nb, ja
 
 
-try:
-    basestring
-except NameError:
-    basestring = str
+_languages = (en.English, de.German, es.Spanish, pt.Portuguese, fr.French,
+             it.Italian, hu.Hungarian, zh.Chinese, nl.Dutch, sv.Swedish,
+             fi.Finnish, bn.Bengali, he.Hebrew, nb.Norwegian, ja.Japanese)
 
 
-set_lang_class(en.English.lang, en.English)
-set_lang_class(de.German.lang, de.German)
-set_lang_class(es.Spanish.lang, es.Spanish)
-set_lang_class(pt.Portuguese.lang, pt.Portuguese)
-set_lang_class(fr.French.lang, fr.French)
-set_lang_class(it.Italian.lang, it.Italian)
-set_lang_class(zh.Chinese.lang, zh.Chinese)
-set_lang_class(nl.Dutch.lang, nl.Dutch)
+for _lang in _languages:
+    util.set_lang_class(_lang.lang, _lang)
 
 
 def load(name, **overrides):
-    target_name, target_version = util.split_data_name(name)
-    data_path = overrides.get('path', util.get_data_path())
-    if target_name == 'en' and 'add_vectors' not in overrides:
-        if 'vectors' in overrides:
-            vec_path = util.match_best_version(overrides['vectors'], None, data_path)
-            if vec_path is None:
-                raise IOError(
-                    'Could not load data pack %s from %s' % (overrides['vectors'], data_path))
-
-        else:
-            vec_path = util.match_best_version('en_glove_cc_300_1m_vectors', None, data_path)
-        if vec_path is not None:
-            vec_path = vec_path / 'vocab' / 'vec.bin'
-            overrides['add_vectors'] = lambda vocab: vocab.load_vectors_from_bin_loc(vec_path)
-    path = util.match_best_version(target_name, target_version, data_path)
-    cls = get_lang_class(target_name)
-    return cls(path=path, **overrides)
+    if overrides.get('path') in (None, False, True):
+        data_path = util.get_data_path()
+        model_name = resolve_model_name(name)
+        model_path = data_path / model_name
+        if not model_path.exists():
+            lang_name = util.get_lang_class(name).lang
+            model_path = None
+            util.print_msg(
+                "Only loading the '{}' tokenizer.".format(lang_name),
+                title="Warning: no model found for '{}'".format(name))
+    else:
+        model_path = util.ensure_path(overrides['path'])
+        data_path = model_path.parent
+        model_name = ''
+    meta = util.parse_package_meta(data_path, model_name, require=False)
+    lang = meta['lang'] if meta and 'lang' in meta else name
+    cls = util.get_lang_class(lang)
+    overrides['meta'] = meta
+    overrides['path'] = model_path
+    return cls(**overrides)

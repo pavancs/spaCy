@@ -1,12 +1,13 @@
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
+# coding: utf8
+from __future__ import division, print_function, unicode_literals
 
 from .gold import tags_to_entities
 
 
 class PRFScore(object):
-    """A precision / recall / F score"""
+    """
+    A precision / recall / F score
+    """
     def __init__(self):
         self.tp = 0
         self.fp = 0
@@ -87,7 +88,7 @@ class Scorer(object):
         gold_ents = set(tags_to_entities([annot[-1] for annot in gold.orig_annot]))
         for id_, word, tag, head, dep, ner in gold.orig_annot:
             gold_tags.add((id_, tag))
-            if dep is not None and dep.lower() not in punct_labels:
+            if dep not in (None, "") and dep.lower() not in punct_labels:
                 gold_deps.add((id_, head, dep.lower()))
         cand_deps = set()
         cand_tags = set()

@@ -1,18 +1,13 @@
+# cython: profile=True
+# coding: utf8
 from __future__ import unicode_literals, print_function
 
-import numpy
 import io
-import json
-import random
 import re
-import os
-from os import path
-
-from libc.string cimport memset
-
-import ujson as json
+import ujson
 
 from .syntax import nonproj
+from .util import ensure_path
 
 
 def tags_to_entities(tags):
@@ -90,9 +85,9 @@ def _min_edit_path(cand_words, gold_words):
     # TODO: Fix this --- just do it properly, make the full edit matrix and
     # then walk back over it...
     # Preprocess inputs
-    cand_words = [punct_re.sub('', w) for w in cand_words] 
-    gold_words = [punct_re.sub('', w) for w in gold_words] 
-    
+    cand_words = [punct_re.sub('', w) for w in cand_words]
+    gold_words = [punct_re.sub('', w) for w in gold_words]
+
     if cand_words == gold_words:
         return 0, ''.join(['M' for _ in gold_words])
     mem = Pool()
@@ -132,7 +127,7 @@ def _min_edit_path(cand_words, gold_words):
             else:
                 best_cost = d_cost
                 best_hist = previous_row[j + 1] + 'D'
-            
+
             current_row.append(best_hist)
             curr_costs[j+1] = best_cost
         previous_row = current_row
@@ -144,12 +139,13 @@ def _min_edit_path(cand_words, gold_words):
 
 
 def read_json_file(loc, docs_filter=None):
-    if path.isdir(loc):
-        for filename in os.listdir(loc):
-            yield from read_json_file(path.join(loc, filename))
+    loc = ensure_path(loc)
+    if loc.is_dir():
+        for filename in loc.iterdir():
+            yield from read_json_file(loc / filename)
     else:
-        with io.open(loc, 'r', encoding='utf8') as file_:
-            docs = json.load(file_)
+        with loc.open('r', encoding='utf8') as file_:
+            docs = ujson.load(file_)
         for doc in docs:
             if docs_filter is not None and not docs_filter(doc):
                 continue
@@ -223,7 +219,8 @@ cdef class GoldParse:
 
     def __init__(self, doc, annot_tuples=None, words=None, tags=None, heads=None,
                  deps=None, entities=None, make_projective=False):
-        """Create a GoldParse.
+        """
+        Create a GoldParse.
 
         Arguments:
             doc (Doc):
@@ -271,8 +268,8 @@ cdef class GoldParse:
         self.words = [None] * len(doc)
         self.tags = [None] * len(doc)
         self.heads = [None] * len(doc)
-        self.labels = [''] * len(doc)
-        self.ner = ['-'] * len(doc)
+        self.labels = [None] * len(doc)
+        self.ner = [None] * len(doc)
 
         self.cand_to_gold = align([t.orth_ for t in doc], words)
         self.gold_to_cand = align(words, [t.orth_ for t in doc])
@@ -305,21 +302,25 @@ cdef class GoldParse:
             self.heads = proj_heads
 
     def __len__(self):
-        """Get the number of gold-standard tokens.
-        
+        """
+        Get the number of gold-standard tokens.
+
         Returns (int): The number of gold-standard tokens.
         """
         return self.length
 
     @property
     def is_projective(self):
-        """Whether the provided syntactic annotations form a projective dependency
-        tree."""
+        """
+        Whether the provided syntactic annotations form a projective dependency
+        tree.
+        """
         return not nonproj.is_nonproj_tree(self.heads)
 
 
 def biluo_tags_from_offsets(doc, entities):
-    '''Encode labelled spans into per-token tags, using the Begin/In/Last/Unit/Out
+    """
+    Encode labelled spans into per-token tags, using the Begin/In/Last/Unit/Out
     scheme (biluo).
 
     Arguments:
@@ -330,7 +331,7 @@ def biluo_tags_from_offsets(doc, entities):
         entities (sequence):
             A sequence of (start, end, label) triples. start and end should be
             character-offset integers denoting the slice into the original string.
-    
+
     Returns:
         tags (list):
             A list of unicode strings, describing the tags. Each tag string will
@@ -348,9 +349,9 @@ def biluo_tags_from_offsets(doc, entities):
         doc = nlp.tokenizer(text)
 
         tags = biluo_tags_from_offsets(doc, entities)
-        
+
         assert tags == ['O', 'O', 'U-LOC', 'O']
-    '''
+    """
     starts = {token.idx: token.i for token in doc}
     ends = {token.idx+len(token): token.i for token in doc}
     biluo = ['-' for _ in doc]

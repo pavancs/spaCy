@@ -1,133 +1,109 @@
-# encoding: utf8
+# coding: utf8
 from __future__ import unicode_literals
 
-
-TOKENIZER_PREFIXES = r'''
-,
-"
-(
-[
-{
-*
-<
->
-$
-£
-¡
-¿
-„
-“
-'
-``
-`
-#
-‘
-....
-...
-…
-‚
-»
-§
-US$
-C$
-A$
-a-
-'''.strip().split('\n')
+import regex as re
+re.DEFAULT_VERSION = re.VERSION1
 
 
-TOKENIZER_SUFFIXES = r'''
-,
-\"
-\)
-\]
-\}
-\*
-\!
-\?
-%
-\$
->
-:
-;
-'
-”
-“
-«
-_
-''
-'s
-'S
-’s
-’S
-’
-‘
-°
-€
-…
-\.\.
-\.\.\.
-\.\.\.\.
-(?<=[a-z0-9)\]”"'%\)])\.
-(?<=[a-zäöüßÖÄÜ)\]"'´«‘’%\)²“”])\.
-\-\-
-´
-(?<=[0-9])km²
-(?<=[0-9])m²
-(?<=[0-9])cm²
-(?<=[0-9])mm²
-(?<=[0-9])km³
-(?<=[0-9])m³
-(?<=[0-9])cm³
-(?<=[0-9])mm³
-(?<=[0-9])ha
-(?<=[0-9])km
-(?<=[0-9])m
-(?<=[0-9])cm
-(?<=[0-9])mm
-(?<=[0-9])µm
-(?<=[0-9])nm
-(?<=[0-9])yd
-(?<=[0-9])in
-(?<=[0-9])ft
-(?<=[0-9])kg
-(?<=[0-9])g
-(?<=[0-9])mg
-(?<=[0-9])µg
-(?<=[0-9])t
-(?<=[0-9])lb
-(?<=[0-9])oz
-(?<=[0-9])m/s
-(?<=[0-9])km/h
-(?<=[0-9])mph
-(?<=[0-9])°C
-(?<=[0-9])°K
-(?<=[0-9])°F
-(?<=[0-9])hPa
-(?<=[0-9])Pa
-(?<=[0-9])mbar
-(?<=[0-9])mb
-(?<=[0-9])T
-(?<=[0-9])G
-(?<=[0-9])M
-(?<=[0-9])K
-(?<=[0-9])kb
-'''.strip().split('\n')
+_UNITS = """
+km km² km³ m m² m³ dm dm² dm³ cm cm² cm³ mm mm² mm³ ha µm nm yd in ft kg g mg
+µg t lb oz m/s km/h kmh mph hPa Pa mbar mb MB kb KB gb GB tb
+TB T G M K
+"""
 
 
-TOKENIZER_INFIXES = r'''
-…
-\.\.\.+
-(?<=[a-z])\.(?=[A-Z])
-(?<=[a-z])\.(?=[A-Z])
-(?<=[a-zA-Z])-(?=[a-zA-z])
-(?<=[a-zA-Z])--(?=[a-zA-z])
-(?<=[0-9])-(?=[0-9])
-(?<=[A-Za-z]),(?=[A-Za-z])
-(?<=[a-zöäüßA-ZÖÄÜ"]):(?=[a-zöäüßA-ZÖÄÜ])
-(?<=[a-zöäüßA-ZÖÄÜ"])>(?=[a-zöäüßA-ZÖÄÜ])
-(?<=[a-zöäüßA-ZÖÄÜ"])<(?=[a-zöäüßA-ZÖÄÜ])
-(?<=[a-zöäüßA-ZÖÄÜ"])=(?=[a-zöäüßA-ZÖÄÜ])
-'''.strip().split('\n')
+_CURRENCY = r"""
+\$ £ € ¥ ฿ US\$ C\$ A\$
+"""
+
+
+_QUOTES = r"""
+' '' " ” “ `` ` ‘ ´ ‚ , „ » «
+"""
+
+
+_PUNCT = r"""
+… , : ; \! \? ¿ ¡ \( \) \[ \] \{ \} < > _ # \* &
+"""
+
+
+_HYPHENS = r"""
+- – — -- ---
+"""
+
+
+LIST_ELLIPSES = [
+    r'\.\.+',
+    "…"
+]
+
+
+LIST_CURRENCY = list(_CURRENCY.strip().split())
+LIST_QUOTES = list(_QUOTES.strip().split())
+LIST_PUNCT = list(_PUNCT.strip().split())
+LIST_HYPHENS = list(_HYPHENS.strip().split())
+
+
+BENGALI = r'[\p{L}&&\p{Bengali}]'
+HEBREW = r'[\p{L}&&\p{Hebrew}]'
+LATIN_LOWER = r'[\p{Ll}&&\p{Latin}]'
+LATIN_UPPER = r'[\p{Lu}&&\p{Latin}]'
+LATIN = r'[[\p{Ll}||\p{Lu}]&&\p{Latin}]'
+
+
+ALPHA_LOWER = '[{}]'.format('||'.join([BENGALI, HEBREW, LATIN_LOWER]))
+ALPHA_UPPER = '[{}]'.format('||'.join([BENGALI, HEBREW, LATIN_UPPER]))
+ALPHA = '[{}]'.format('||'.join([BENGALI, HEBREW, LATIN]))
+
+
+QUOTES = _QUOTES.strip().replace(' ', '|')
+CURRENCY = _CURRENCY.strip().replace(' ', '|')
+UNITS = _UNITS.strip().replace(' ', '|').replace('\n', '|')
+HYPHENS = _HYPHENS.strip().replace(' ', '|')
+
+
+
+# Prefixes
+
+TOKENIZER_PREFIXES = (
+    ['§', '%', '=', r'\+'] +
+    LIST_PUNCT +
+    LIST_ELLIPSES +
+    LIST_QUOTES +
+    LIST_CURRENCY
+)
+
+
+# Suffixes
+
+TOKENIZER_SUFFIXES = (
+    LIST_PUNCT +
+    LIST_ELLIPSES +
+    LIST_QUOTES +
+    [
+        r'(?<=[0-9])\+',
+        r'(?<=°[FfCcKk])\.',
+        r'(?<=[0-9])(?:{c})'.format(c=CURRENCY),
+        r'(?<=[0-9])(?:{u})'.format(u=UNITS),
+        r'(?<=[0-9{al}{p}(?:{q})])\.'.format(al=ALPHA_LOWER, p=r'%²\-\)\]\+', q=QUOTES),
+        r'(?<=[{au}][{au}])\.'.format(au=ALPHA_UPPER),
+        "'s", "'S", "’s", "’S"
+    ]
+)
+
+
+# Infixes
+
+TOKENIZER_INFIXES = (
+    LIST_ELLIPSES +
+    [
+        r'(?<=[0-9])[+\-\*^](?=[0-9-])',
+        r'(?<=[{al}])\.(?=[{au}])'.format(al=ALPHA_LOWER, au=ALPHA_UPPER),
+        r'(?<=[{a}]),(?=[{a}])'.format(a=ALPHA),
+        r'(?<=[{a}])[?";:=,.]*(?:{h})(?=[{a}])'.format(a=ALPHA, h=HYPHENS),
+        r'(?<=[{a}"])[:<>=/](?=[{a}])'.format(a=ALPHA)
+    ]
+)
 
 
 __all__ = ["TOKENIZER_PREFIXES", "TOKENIZER_SUFFIXES", "TOKENIZER_INFIXES"]

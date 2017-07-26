@@ -38,6 +38,11 @@ p
 
 +h(2, "pos-tagging") Part-of-speech Tagging
 
++infobox("Tip: Understanding tags")
+    |  In spaCy v1.9+, you can also use #[code spacy.explain()] to get the
+    |  description for the string representation of a tag. For example,
+    |  #[code spacy.explain("RB")] will return "adverb".
+
 include _annotation/_pos-tags
 
 +h(2, "lemmatization") Lemmatization
@@ -50,6 +55,13 @@ p A "lemma" is the uninflected form of a word. In English, this means:
     +item #[strong Nouns]: The form like "dog", not "dogs"; like "child", not "children"
     +item #[strong Verbs]: The form like "write", not "writes", "writing", "wrote" or "written"
 
++aside("About spaCy's custom pronoun lemma")
+    |  Unlike verbs and common nouns, there's no clear base form of a personal
+    |  pronoun. Should the lemma of "me" be "I", or should we normalize person
+    |  as well, giving "it" — or maybe "he"? spaCy's solution is to introduce a
+    |  novel symbol, #[code.u-nowrap -PRON-], which is used as the lemma for
+    |  all personal pronouns.
+
 p
     |  The lemmatization data is taken from
     |  #[+a("https://wordnet.princeton.edu") WordNet]. However, we also add a
@@ -58,12 +70,48 @@ p
 
 +h(2, "dependency-parsing") Syntactic Dependency Parsing
 
-p
-    |  The parser is trained on data produced by the
-    |  #[+a("http://www.clearnlp.com") ClearNLP] converter. Details of the
-    |  annotation scheme can be found
-    |  #[+a("http://www.mathcs.emory.edu/~choi/doc/clear-dependency-2012.pdf") here].
++infobox("Tip: Understanding labels")
+    |  In spaCy v1.9+, you can also use #[code spacy.explain()] to get the
+    |  description for the string representation of a label. For example,
+    |  #[code spacy.explain("prt")] will return "particle".
+
+include _annotation/_dep-labels
 
 +h(2, "named-entities") Named Entity Recognition
 
++infobox("Tip: Understanding entity types")
+    |  In spaCy v1.9+, you can also use #[code spacy.explain()] to get the
+    |  description for the string representation of an entity label. For example,
+    |  #[code spacy.explain("LANGUAGE")] will return "any named language".
+
 include _annotation/_named-entities
+
++h(2, "json-input") JSON input format for training
+
+p
+    |  spaCy takes training data in the following format:
+
++code("Example structure").
+    doc: {
+        id: string,
+        paragraphs: [{
+            raw: string,
+            sents: [int],
+            tokens: [{
+                start: int,
+                tag: string,
+                head: int,
+                dep: string
+            }],
+            ner: [{
+                start: int,
+                end: int,
+                label: string
+            }],
+            brackets: [{
+                start: int,
+                end: int,
+                label: string
+            }]
+        }]
+    }

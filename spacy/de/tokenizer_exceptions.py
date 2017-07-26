@@ -1,8 +1,8 @@
-# encoding: utf8
+# coding: utf8
 from __future__ import unicode_literals
 
 from ..symbols import *
-from ..language_data import PRON_LEMMA
+from ..language_data import PRON_LEMMA, DET_LEMMA
 
 
 TOKENIZER_EXCEPTIONS = {
@@ -15,23 +15,27 @@ TOKENIZER_EXCEPTIONS = {
     ],
 
     "'S": [
-        {ORTH: "'S", LEMMA: PRON_LEMMA}
+        {ORTH: "'S", LEMMA: PRON_LEMMA, TAG: "PPER"}
     ],
 
     "'n": [
-        {ORTH: "'n", LEMMA: "ein"}
+        {ORTH: "'n", LEMMA: DET_LEMMA, NORM: "ein"}
     ],
 
     "'ne": [
-        {ORTH: "'ne", LEMMA: "eine"}
+        {ORTH: "'ne", LEMMA: DET_LEMMA, NORM: "eine"}
     ],
 
     "'nen": [
-        {ORTH: "'nen", LEMMA: "einen"}
+        {ORTH: "'nen", LEMMA: DET_LEMMA, NORM: "einen"}
+    ],
+
+    "'nem": [
+        {ORTH: "'nem", LEMMA: DET_LEMMA, NORM: "einem"}
     ],
 
     "'s": [
-        {ORTH: "'s", LEMMA: PRON_LEMMA}
+        {ORTH: "'s", LEMMA: PRON_LEMMA, TAG: "PPER"}
     ],
 
     "Abb.": [
@@ -195,7 +199,7 @@ TOKENIZER_EXCEPTIONS = {
     ],
 
     "S'": [
-        {ORTH: "S'", LEMMA: PRON_LEMMA}
+        {ORTH: "S'", LEMMA: PRON_LEMMA, TAG: "PPER"}
     ],
 
     "Sa.": [
@@ -244,7 +248,7 @@ TOKENIZER_EXCEPTIONS = {
 
     "auf'm": [
         {ORTH: "auf", LEMMA: "auf"},
-        {ORTH: "'m", LEMMA: PRON_LEMMA}
+        {ORTH: "'m", LEMMA: DET_LEMMA, NORM: "dem" }
     ],
 
     "bspw.": [
@@ -268,8 +272,8 @@ TOKENIZER_EXCEPTIONS = {
     ],
 
     "du's": [
-        {ORTH: "du", LEMMA: PRON_LEMMA},
-        {ORTH: "'s", LEMMA: PRON_LEMMA}
+        {ORTH: "du", LEMMA: PRON_LEMMA, TAG: "PPER"},
+        {ORTH: "'s", LEMMA: PRON_LEMMA, TAG: "PPER", NORM: "es"}
     ],
 
     "ebd.": [
@@ -285,8 +289,8 @@ TOKENIZER_EXCEPTIONS = {
     ],
 
     "er's": [
-        {ORTH: "er", LEMMA: PRON_LEMMA},
-        {ORTH: "'s", LEMMA: PRON_LEMMA}
+        {ORTH: "er", LEMMA: PRON_LEMMA, TAG: "PPER"},
+        {ORTH: "'s", LEMMA: PRON_LEMMA, TAG: "PPER", NORM: "es"}
     ],
 
     "evtl.": [
@@ -315,7 +319,7 @@ TOKENIZER_EXCEPTIONS = {
 
     "hinter'm": [
         {ORTH: "hinter", LEMMA: "hinter"},
-        {ORTH: "'m", LEMMA: PRON_LEMMA}
+        {ORTH: "'m", LEMMA: DET_LEMMA, NORM: "dem"}
     ],
 
     "i.O.": [
@@ -327,13 +331,13 @@ TOKENIZER_EXCEPTIONS = {
     ],
 
     "ich's": [
-        {ORTH: "ich", LEMMA: PRON_LEMMA},
-        {ORTH: "'s", LEMMA: PRON_LEMMA}
+        {ORTH: "ich", LEMMA: PRON_LEMMA, TAG: "PPER"},
+        {ORTH: "'s", LEMMA: PRON_LEMMA, TAG: "PPER", NORM: "es"}
     ],
 
     "ihr's": [
-        {ORTH: "ihr", LEMMA: PRON_LEMMA},
-        {ORTH: "'s", LEMMA: PRON_LEMMA}
+        {ORTH: "ihr", LEMMA: PRON_LEMMA, TAG: "PPER"},
+        {ORTH: "'s", LEMMA: PRON_LEMMA, TAG: "PPER", NORM: "es"}
     ],
 
     "incl.": [
@@ -385,7 +389,7 @@ TOKENIZER_EXCEPTIONS = {
     ],
 
     "s'": [
-        {ORTH: "s'", LEMMA: PRON_LEMMA}
+        {ORTH: "s'", LEMMA: PRON_LEMMA, TAG: "PPER"}
     ],
 
     "s.o.": [
@@ -393,8 +397,8 @@ TOKENIZER_EXCEPTIONS = {
     ],
 
     "sie's": [
-        {ORTH: "sie", LEMMA: PRON_LEMMA},
-        {ORTH: "'s", LEMMA: PRON_LEMMA}
+        {ORTH: "sie", LEMMA: PRON_LEMMA, TAG: "PPER"},
+        {ORTH: "'s", LEMMA: PRON_LEMMA, TAG: "PPER", NORM: "es"}
     ],
 
     "sog.": [
@@ -423,7 +427,7 @@ TOKENIZER_EXCEPTIONS = {
 
     "unter'm": [
         {ORTH: "unter", LEMMA: "unter"},
-        {ORTH: "'m", LEMMA: PRON_LEMMA}
+        {ORTH: "'m", LEMMA: DET_LEMMA, NORM: "dem"}
     ],
 
     "usf.": [
@@ -464,12 +468,12 @@ TOKENIZER_EXCEPTIONS = {
 
     "vor'm": [
         {ORTH: "vor", LEMMA: "vor"},
-        {ORTH: "'m", LEMMA: PRON_LEMMA}
+        {ORTH: "'m", LEMMA: DET_LEMMA, NORM: "dem"}
     ],
 
     "wir's": [
-        {ORTH: "wir", LEMMA: PRON_LEMMA},
-        {ORTH: "'s", LEMMA: PRON_LEMMA}
+        {ORTH: "wir", LEMMA: PRON_LEMMA, TAG: "PPER"},
+        {ORTH: "'s", LEMMA: PRON_LEMMA, TAG: "PPER", NORM: "es"}
     ],
 
     "z.B.": [
@@ -506,17 +510,12 @@ TOKENIZER_EXCEPTIONS = {
 
     "über'm": [
         {ORTH: "über", LEMMA: "über"},
-        {ORTH: "'m", LEMMA: PRON_LEMMA}
+        {ORTH: "'m", LEMMA: DET_LEMMA, NORM: "dem"}
     ]
 }
 
 
 ORTH_ONLY = [
-    "'",
-    "\\\")",
-    "<space>",
-    "a.",
-    "ä.",
     "A.C.",
     "a.D.",
     "A.D.",
@@ -526,24 +525,20 @@ ORTH_ONLY = [
     "Abs.",
     "adv.",
     "al.",
-    "b.",
     "B.A.",
     "B.Sc.",
     "betr.",
     "biol.",
     "Biol.",
-    "c.",
     "ca.",
     "Chr.",
     "Cie.",
     "co.",
     "Co.",
-    "d.",
     "D.C.",
     "Dipl.-Ing.",
     "Dipl.",
     "Dr.",
-    "e.",
     "e.g.",
     "e.V.",
     "ehem.",
@@ -551,79 +546,57 @@ ORTH_ONLY = [
     "erm.",
     "etc.",
     "ev.",
-    "f.",
-    "g.",
     "G.m.b.H.",
     "geb.",
     "Gebr.",
     "gem.",
-    "h.",
     "h.c.",
     "Hg.",
     "hrsg.",
     "Hrsg.",
-    "i.",
     "i.A.",
     "i.e.",
     "i.G.",
     "i.Tr.",
     "i.V.",
     "Ing.",
-    "j.",
     "jr.",
     "Jr.",
     "jun.",
     "jur.",
-    "k.",
     "K.O.",
-    "l.",
     "L.A.",
     "lat.",
-    "m.",
     "M.A.",
     "m.E.",
     "m.M.",
     "M.Sc.",
     "Mr.",
-    "n.",
     "N.Y.",
     "N.Y.C.",
     "nat.",
     "ö."
-    "o.",
     "o.a.",
     "o.ä.",
     "o.g.",
     "o.k.",
     "O.K.",
-    "p.",
     "p.a.",
     "p.s.",
     "P.S.",
     "pers.",
     "phil.",
-    "q.",
     "q.e.d.",
-    "r.",
     "R.I.P.",
     "rer.",
-    "s.",
     "sen.",
     "St.",
     "std.",
-    "t.",
-    "u.",
-    "ü.",
     "u.a.",
     "U.S.",
     "U.S.A.",
     "U.S.S.",
-    "v.",
     "Vol.",
     "vs.",
-    "w.",
-    "wiss.",
-    "x.",
-    "y.",
-    "z.",
+    "wiss."
 ]
